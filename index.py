@@ -7,14 +7,17 @@ import requests
 from PyQt5.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QPushButton,QTextEdit,QLineEdit,QLabel,QComboBox
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl,QThread,pyqtSignal,Qt
+from PyQt5.QtGui import QIcon
 
 # 超时
-# TODO 请求线程发送详细信息
-# TODO 支持多方法
+# 请求详细信息
+# 支持多方法
 # TODO 支持参数
 # 编码问题
 # TODO 美化、字体
 # TODO AUTO模式，自动控制http方法
+# TODO 增加记录
+# TODO 增加侧边栏
 
 def jsonPretty(jstr):
     return json.dump(json.loads(jstr), indent=2)
@@ -88,6 +91,7 @@ class Window(QWidget):
 
     def __renderSelf(self):
         self.layout = QVBoxLayout(self)
+        self.setWindowIcon(QIcon('./assets/icon.ico'))
         self.resize(900, 600)
 
     def __renderComponents(self):
