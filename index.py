@@ -106,8 +106,8 @@ class Window(QWidget):
         inputLayout = QHBoxLayout()
         inputLayout.addWidget(self.reqMethodCombo)
         inputLayout.addWidget(self.reqUrlInput)
+        inputLayout.addWidget(self.reqButton)
         self.layout.addLayout(inputLayout)
-        self.layout.addWidget(self.reqButton)
         self.layout.addWidget(self.resTab)
 
     def __createResTab(self):
