@@ -18,6 +18,7 @@ from PyQt5.QtGui import QIcon,QFont,QFontDatabase
 # TODO AUTO模式，自动控制http方法
 # TODO 增加记录
 # TODO 增加侧边栏
+# TODO 解决不报错问题
 
 def jsonPretty(jstr):
     return json.dump(json.loads(jstr), indent=2)
@@ -32,12 +33,8 @@ class RequestThread(QThread):
             'user-agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36'
         }
     def __request(self, options):
-        if options['method'] == 'GET':
-            response = requests.get(options['url'], headers=options['headers'])
-            return response
-        elif options['method'] == 'POST':
-            response = requests.post(options['url'], headers=options['headers'])
-            return response
+        response = requests.request(options['method'], options['url'], headers=options['headers'], data=window.body, params=window.query)
+        return response
     def run(self):
         start = time.time()
         url = self._window.reqUrlInput.text()
@@ -62,12 +59,13 @@ class RequestThread(QThread):
             print(response.cookies)
             stats = 'Status: Success \n'
             stats += '{}: {}\n'.format('Code', response.status_code)
+            stats += '{}: {:.3f}s\n'.format('ResponseTime', time.time() - start)
             stats += '{}: {}\n'.format('Encoding', response.encoding)
             stats += '{}: {}\n'.format('Headers', json.dumps(dict(response.headers), indent=2))
             print('Request Success:', response.url)
         except Exception as e:
-            print('Request Failed:', e)
-            stats = 'Status: Failed \n' + 'Error:\n' + str(e)
+            #print('Request Failed:', e)
+            stats = 'Status: Failed \n' + 'Error: ' + str(e)
         print('请求耗时：', time.time() - start)
         sigData = {
             'url': url,
@@ -150,8 +148,21 @@ class Window(QWidget):
             self.resJSON.setPlainText('Not a JSON string')
         self.resView.setHtml(res['text'])
 
+    def __paramParser(self, paramText):
+        param = {}
+        paramLines = str.split(paramText, '\n')
+        for line in paramLines:
+            items = str.split(line)
+            if len(items) == 2:
+                param[str(items[0])] = str(items[1])
+        return param
+
     def __request(self):
         self.__clearAll()
+        bodyRaw = self.bodyEdit.toPlainText()
+        self.body = self.__paramParser(bodyRaw)
+        queryRaw = self.queryEdit.toPlainText()
+        self.query = self.__paramParser(queryRaw)
         self.resView.setHtml('')
         # self.resView.setUrl(QUrl(self.reqUrlInput.text()))
         self.requestThread.finishSignal.connect(self.__setRes)
@@ -164,7 +175,8 @@ class Window(QWidget):
         self.resJSON.setText('Requesting...')
 
     def keyPressEvent(self, event):
-        if event.key() in (16777220, 16777221):
+        print(event.key())
+        if event.key() in (16777268, 16777220, 16777221):
             self.__request()
 
 
