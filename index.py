@@ -7,14 +7,14 @@ import requests
 from PyQt5.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QPushButton,QTextEdit,QLineEdit,QLabel,QComboBox
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl,QThread,pyqtSignal,Qt
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon,QFont,QFontDatabase
 
 # 超时
 # 请求详细信息
 # 支持多方法
 # TODO 支持参数
 # 编码问题
-# TODO 美化、字体
+# TODO 美化、字体\
 # TODO AUTO模式，自动控制http方法
 # TODO 增加记录
 # TODO 增加侧边栏
@@ -45,6 +45,7 @@ class RequestThread(QThread):
         try:
             print('Request Sending:', url)
             method = window.reqMethodCombo.currentText()
+            print(method)
             response = self.__request({
                 'url': url,
                 'method': method,
@@ -126,12 +127,18 @@ class Window(QWidget):
     def __setRes(self, res):
         self.resStats.setPlainText(res['stats'])
         self.resText.setPlainText(res['text'])
-        self.resJSON.setPlainText(res['text'])
+        try :
+            jsonstr = json.dumps(json.loads(res['text']), indent=2, ensure_ascii=False)
+            self.resJSON.setPlainText(jsonstr)
+        except Exception as e:
+            print(e)
+            self.resJSON.setPlainText('Not a JSON string')
+        self.resView.setHtml(res['text'])
 
     def __request(self):
         self.__clearAll()
         self.resView.setHtml('')
-        self.resView.setUrl(QUrl(self.reqUrlInput.text()))
+        # self.resView.setUrl(QUrl(self.reqUrlInput.text()))
         self.requestThread.finishSignal.connect(self.__setRes)
         self.requestThread.start()
 
@@ -147,6 +154,14 @@ class Window(QWidget):
 
 
 app = QApplication(sys.argv)
+
+fontId = QFontDatabase.addApplicationFont('./assets/MSYHMONO.ttf')
+fontFamilies = QFontDatabase.applicationFontFamilies(fontId)
+font = QFont()
+font.setFamily(fontFamilies[0])
+font.setPixelSize(12)
+app.setFont(font)
+
 window = Window()
 
 sys.exit(app.exec_())
