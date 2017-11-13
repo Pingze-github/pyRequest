@@ -96,6 +96,7 @@ class Window(QWidget):
         self.resize(900, 600)
 
     def __renderComponents(self):
+        # input
         self.reqMethodCombo = QComboBox()
         self.reqMethodCombo.addItems(['GET', 'POST'])
         self.reqUrlInput = QLineEdit()
@@ -103,12 +104,26 @@ class Window(QWidget):
         self.reqButton = QPushButton()
         self.reqButton.setText('SEND')
         self.reqButton.clicked.connect(self.__request)
-        self.resTab = self.__createResTab()
         inputLayout = QHBoxLayout()
         inputLayout.addWidget(self.reqMethodCombo)
         inputLayout.addWidget(self.reqUrlInput)
         inputLayout.addWidget(self.reqButton)
+        # body&query
+        self.queryEdit = QTextEdit()
+        self.bodyEdit = QTextEdit()
+        queryLayout = QVBoxLayout()
+        queryLayout.addWidget(QLabel('Query'))
+        queryLayout.addWidget(self.queryEdit)
+        bodyLayout = QVBoxLayout()
+        bodyLayout.addWidget(QLabel('Body'))
+        bodyLayout.addWidget(self.bodyEdit)
+        paramLayout = QHBoxLayout()
+        paramLayout.addLayout(queryLayout)
+        paramLayout.addLayout(bodyLayout)
         self.layout.addLayout(inputLayout)
+        self.layout.addLayout(paramLayout)
+        # response
+        self.resTab = self.__createResTab()
         self.layout.addWidget(self.resTab)
 
     def __createResTab(self):
