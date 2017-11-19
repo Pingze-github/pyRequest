@@ -1,15 +1,18 @@
 
+import os
 import sys
 import time
 import re
 import json
+import pickle
 from urllib.parse import urlparse
 from collections import OrderedDict
 import requests
-from PyQt5.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QPushButton,QTextEdit,QLineEdit,QLabel,QComboBox
+from PyQt5.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QTabWidget,QPushButton,QTextEdit,QPlainTextEdit,QLineEdit,QLabel,QComboBox,QListWidget,QListWidgetItem
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import QUrl,QThread,pyqtSignal,Qt
+from PyQt5.QtCore import QUrl,QThread,pyqtSignal
 from PyQt5.QtGui import QIcon,QFont,QFontDatabase
+
 
 # 超时
 # 请求详细信息
@@ -27,6 +30,20 @@ from PyQt5.QtGui import QIcon,QFont,QFontDatabase
 # url和query联动
 # TODO 尾部状态栏
 # TODO Request标签页 自动切换
+
+dataPath = 'data.pkl'
+
+# 全局异常捕获
+def printErrors(exc_type, exc_value, traceback):
+    sys.stderr.write(traceback)
+sys.excepthook = printErrors
+
+# 不存在data则新建一个
+if not os.path.exists(dataPath) or not os.path.isfile(dataPath):
+    with open(dataPath, 'wb') as f:
+        pickle.dump({}, f)
+with open(dataPath, 'rb') as f:
+    logs = pickle.load(f)
 
 def jsonPretty(jstr):
     return json.dump(json.loads(jstr), indent=2)
@@ -75,6 +92,10 @@ class RequestThread(QThread):
             #print('Request Failed:', e)
             stats = 'Status: Failed \n' + 'Error: ' + str(e)
         print('请求耗时：', time.time() - start)
+        try :
+            text = json.dumps(json.loads(text), ensure_ascii=False)
+        except:
+            pass
         sigData = {
             'url': url,
             'text': text,
@@ -117,6 +138,7 @@ def urlencodeFromMap(m):
 class Window(QWidget):
     query = {}
     reqStatsObj = {}
+    zoom = 1.2
 
     def __init__(self):
         super().__init__()
@@ -124,28 +146,43 @@ class Window(QWidget):
         self.show()
         self.reqUrlInput.setFocus()
         self.requestThread = RequestThread(self)
+        self.requestThread.finishSignal.connect(self.__setRes)
 
     # 渲染组件
     def __render(self):
         self.setWindowTitle('PyRequest')
         self.__renderSelf()
-        self.__renderComponents()
+        self.__renderMain()
+        self.__renderLeft()
         self.reqUrlInput.textEdited.emit(self.reqUrlInput.text())
         self.queryEdit.textChanged.emit()
         self.bodyEdit.textChanged.emit()
 
     def __renderSelf(self):
-        self.layout = QVBoxLayout(self)
+        self.leftLayout = QVBoxLayout()
+        self.mainLayout = QVBoxLayout()
+        layout = QHBoxLayout(self)
+        layout.addLayout(self.leftLayout)
+        layout.addLayout(self.mainLayout)
         self.setWindowIcon(QIcon('assets/icon.ico'))
-        self.resize(900, 600)
+        self.resize(900 * self.zoom, 600 * self.zoom)
 
-    def __renderComponents(self):
+    def __renderLeft(self):
+        self.reqList = QListWidget()
+        self.reqList.setMaximumWidth(300)
+        print(logs)
+        for log in logs:
+            print(log)
+            self.reqList.addItem(QListWidgetItem(log['url']))
+        self.leftLayout.addWidget(self.reqList)
+
+    def __renderMain(self):
         # input
         self.reqMethodCombo = QComboBox()
         self.reqMethodCombo.addItems(['GET', 'POST'])
         self.reqMethodCombo.currentTextChanged.connect(self.__methodChange)
         self.reqUrlInput = QLineEdit()
-        self.reqUrlInput.setText('http://www.duoyi.com')
+        self.reqUrlInput.setText('http://ip.taobao.com/service/getIpInfo.php?ip=59.41.95.234')
         self.reqUrlInput.textEdited.connect(self.__urlChanged)
         self.reqButton = QPushButton()
         self.reqButton.setText('SEND')
@@ -156,11 +193,10 @@ class Window(QWidget):
         inputLayout.addWidget(self.reqButton)
         # body&query
         self.queryLabel = QLabel('Query')
-        self.queryEdit = QTextEdit()
-        # self.queryEdit.grabKeyboard()
+        self.queryEdit = QPlainTextEdit()
         self.queryEdit.textChanged.connect(self.__queryEditChanged)
         self.bodyLabel = QLabel('Body')
-        self.bodyEdit = QTextEdit()
+        self.bodyEdit = QPlainTextEdit()
         self.bodyEdit.textChanged.connect(self.__bodyEditChanged)
         queryLayout = QVBoxLayout()
         queryLayout.addWidget(self.queryLabel)
@@ -173,11 +209,11 @@ class Window(QWidget):
         paramLayout = QHBoxLayout()
         paramLayout.addLayout(queryLayout)
         paramLayout.addLayout(bodyLayout)
-        self.layout.addLayout(inputLayout)
-        self.layout.addLayout(paramLayout)
+        self.mainLayout.addLayout(inputLayout)
+        self.mainLayout.addLayout(paramLayout)
         # response
         self.resTab = self.__createResTab()
-        self.layout.addWidget(self.resTab)
+        self.mainLayout.addWidget(self.resTab)
 
     def __createResTab(self):
         resTab = QTabWidget()
@@ -193,9 +229,19 @@ class Window(QWidget):
         resTab.addTab(self.resView, 'view')
         return resTab
 
+    # 发起请求
+    def __request(self):
+        self.__clearAll()
+        bodyRaw = self.bodyEdit.toPlainText()
+        self.body = formatParamParse(bodyRaw)
+        self.resView.setHtml('')
+        # self.resView.setUrl(QUrl(self.reqUrlInput.text()))
+        self.requestThread.start()
+
     # 处理返回
     def __setRes(self, res):
-        self.resTab.setCurrentIndex(1)
+        if (self.resTab.currentIndex() == 0):
+            self.resTab.setCurrentIndex(1)
         self.resStats.setPlainText(res['stats'])
         self.resText.setPlainText(res['text'])
         try :
@@ -205,16 +251,23 @@ class Window(QWidget):
             print(e)
             self.resJSON.setPlainText('Not a JSON string')
         self.resView.setHtml(res['text'])
+        logs = self.__log()
 
-    # 发起请求
-    def __request(self):
-        self.__clearAll()
-        bodyRaw = self.bodyEdit.toPlainText()
-        self.body = formatParamParse(bodyRaw)
-        self.resView.setHtml('')
-        # self.resView.setUrl(QUrl(self.reqUrlInput.text()))
-        self.requestThread.finishSignal.connect(self.__setRes)
-        self.requestThread.start()
+    # 请求记录
+    # TODO 作为独立IO线程
+    def __log(self):
+        log = {}
+        log['url'] = self.reqUrlInput.text()
+        log['query'] = self.queryEdit.toPlainText()
+        log['body'] = self.bodyEdit.toPlainText()
+        with open('data.pkl', 'rb') as f:
+            logs = pickle.load(f)
+        with open('data.pkl', 'wb') as f:
+            if not logs or type(logs) != list:
+                logs = []
+            logs.append(log)
+            pickle.dump(logs, f)
+        return logs
 
     # 清空返回栏
     def __clearAll(self):
@@ -310,3 +363,4 @@ if font:
 window = Window()
 
 sys.exit(app.exec_())
+

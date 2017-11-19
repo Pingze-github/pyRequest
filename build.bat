@@ -1,5 +1,5 @@
 pyinstaller --noconfirm --log-level=INFO ^
-    --onefile --windowed ^
+    --onedir --windowed ^
     --add-data "assets/icon.ico;assets" ^
     --add-data "assets/MSYHMONO.ttf;assets" ^
     --icon=./assets/icon.ico ^
