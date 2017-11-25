@@ -4,7 +4,6 @@ import sys
 import time
 import re
 import json
-import pickle
 from urllib.parse import urlparse
 from collections import OrderedDict
 import requests
@@ -13,6 +12,13 @@ from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtCore import QUrl,QThread,pyqtSignal
 from PyQt5.QtGui import QIcon,QFont,QFontDatabase
 
+# 全局异常捕获
+def printErrors(exc_type, exc_value, traceback):
+    sys.stderr.write(traceback)
+sys.excepthook = printErrors
+
+from lib.sqlite import ReqLogDB
+reqLogDB = ReqLogDB()
 
 # 超时
 # 请求详细信息
@@ -31,19 +37,11 @@ from PyQt5.QtGui import QIcon,QFont,QFontDatabase
 # TODO 尾部状态栏
 # TODO Request标签页 自动切换
 
+# 全局变量
+
 dataPath = 'data.pkl'
 
-# 全局异常捕获
-def printErrors(exc_type, exc_value, traceback):
-    sys.stderr.write(traceback)
-sys.excepthook = printErrors
-
-# 不存在data则新建一个
-if not os.path.exists(dataPath) or not os.path.isfile(dataPath):
-    with open(dataPath, 'wb') as f:
-        pickle.dump({}, f)
-with open(dataPath, 'rb') as f:
-    logs = pickle.load(f)
+logs = reqLogDB.selectAll()
 
 def jsonPretty(jstr):
     return json.dump(json.loads(jstr), indent=2)
@@ -169,12 +167,27 @@ class Window(QWidget):
 
     def __renderLeft(self):
         self.reqList = QListWidget()
+        self.reqList.itemClicked.connect(self.__logItemClicked)
         self.reqList.setMaximumWidth(300)
-        print(logs)
         for log in logs:
-            print(log)
-            self.reqList.addItem(QListWidgetItem(log['url']))
+            logItem = QListWidgetItem(log['url'])
+            logItem.setData(3, log['id'])
+            self.reqList.addItem(logItem)
         self.leftLayout.addWidget(self.reqList)
+
+    def __logItemClicked(self, item):
+        id = item.data(3)
+        log = reqLogDB.selectOne(id)
+        print(log)
+        self.reqMethodCombo.setCurrentText(log['method'])
+        self.reqUrlInput.setText(log['url'])
+        self.queryEdit.setPlainText(log['query'])
+        self.bodyEdit.setPlainText(log['body'])
+
+    def __appendLog(self, log):
+        logItem = QListWidgetItem(log['url'])
+        logItem.setData(3, log['id'])
+        self.reqList.insertItem(0, logItem)
 
     def __renderMain(self):
         # input
@@ -251,23 +264,18 @@ class Window(QWidget):
             print(e)
             self.resJSON.setPlainText('Not a JSON string')
         self.resView.setHtml(res['text'])
-        logs = self.__log()
+        self.__log()
 
     # 请求记录
-    # TODO 作为独立IO线程
     def __log(self):
         log = {}
+        log['method'] = self.reqMethodCombo.currentText()
         log['url'] = self.reqUrlInput.text()
         log['query'] = self.queryEdit.toPlainText()
         log['body'] = self.bodyEdit.toPlainText()
-        with open('data.pkl', 'rb') as f:
-            logs = pickle.load(f)
-        with open('data.pkl', 'wb') as f:
-            if not logs or type(logs) != list:
-                logs = []
-            logs.append(log)
-            pickle.dump(logs, f)
-        return logs
+        id = reqLogDB.insert(log)
+        log['id'] = id
+        self.__appendLog(log)
 
     # 清空返回栏
     def __clearAll(self):
