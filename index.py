@@ -170,23 +170,24 @@ class Window(QWidget):
         self.reqList.itemClicked.connect(self.__logItemClicked)
         self.reqList.setMaximumWidth(300)
         for log in logs:
-            logItem = QListWidgetItem(log['url'])
-            logItem.setData(3, log['id'])
+            logItem = QListWidgetItem(log['method'] + ' ' + log['url'])
+            logItem.setData(99, log['id'])
             self.reqList.addItem(logItem)
         self.leftLayout.addWidget(self.reqList)
 
     def __logItemClicked(self, item):
-        id = item.data(3)
+        id = item.data(99)
         log = reqLogDB.selectOne(id)
         print(log)
         self.reqMethodCombo.setCurrentText(log['method'])
         self.reqUrlInput.setText(log['url'])
         self.queryEdit.setPlainText(log['query'])
         self.bodyEdit.setPlainText(log['body'])
+        self.__clearRes()
 
     def __appendLog(self, log):
-        logItem = QListWidgetItem(log['url'])
-        logItem.setData(3, log['id'])
+        logItem = QListWidgetItem(log['method'] + ' ' + log['url'])
+        logItem.setData(99, log['id'])
         self.reqList.insertItem(0, logItem)
 
     def __renderMain(self):
@@ -244,7 +245,7 @@ class Window(QWidget):
 
     # 发起请求
     def __request(self):
-        self.__clearAll()
+        self.__clearRes()
         bodyRaw = self.bodyEdit.toPlainText()
         self.body = formatParamParse(bodyRaw)
         self.resView.setHtml('')
@@ -278,11 +279,11 @@ class Window(QWidget):
         self.__appendLog(log)
 
     # 清空返回栏
-    def __clearAll(self):
-        self.resStats.setText('Requesting...')
-        self.resText.setText('Requesting...')
-        self.resView.setHtml('Requesting...')
-        self.resJSON.setText('Requesting...')
+    def __clearRes(self):
+        self.resStats.setText('')
+        self.resText.setText('')
+        self.resView.setHtml('')
+        self.resJSON.setText('')
 
     # 方法切换
     def __methodChange(self, text):
